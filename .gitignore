@@ -1,0 +1,22 @@
+# Virtual environment
+venv/
+
+# Python compiled files
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+
+# Streamlit folder
+.streamlit/
+
+# Jupyter Notebook files
+.ipynb_checkpoints/
+
+# VS Code settings
+.vscode/
+
+# Miscellaneous
+.DS_Store
+*.swp
+*.swo
