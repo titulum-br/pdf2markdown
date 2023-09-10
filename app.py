@@ -1,38 +1,44 @@
 import streamlit as st
-import tabula
 import pandas as pd
-from PyPDF2 import PdfFileReader, PdfFileWriter
+import pdfplumber
+from pdf2image import convert_from_path
 import tempfile
 
-# Streamlit layout
-st.title("PDF Table to LaTeX Converter")
+# Streamlit layout for the left sidebar
+st.sidebar.title("PDF Table to LaTeX Converter")
+pdf_file = st.sidebar.file_uploader("Upload a PDF", type=['pdf'])
 
-pdf_file = st.file_uploader("Upload a PDF", type=['pdf'])
 
-# Read PDF and show on the left
+# Read PDF and show on the left sidebar
 if pdf_file:
-    st.sidebar.title("PDF Display")
-    pdf_reader = PdfFileReader(pdf_file)
-    total_pages = pdf_reader.numPages
+        # Save uploaded file to a temporary location
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+        temp_file.write(pdf_file.read())
+        temp_path = temp_file.name
+    # Use pdfplumber to get the number of pages
+    with pdfplumber.open(pdf_file) as pdf:
+        total_pages = len(pdf.pages)
+    
+    # Create a slider in the sidebar to select a page
     page = st.sidebar.slider("Select a page", 1, total_pages)
-    
-    # Create a temporary file for the selected PDF page
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-        pdf_writer = PdfFileWriter()
-        pdf_writer.addPage(pdf_reader.getPage(page-1))
-        pdf_writer.write(temp_pdf)
-        temp_pdf_path = temp_pdf.name
-    
-    # Display PDF using an iframe
-    pdf_display = f'<iframe src="file://{temp_pdf_path}" width="400" height="600"></iframe>'
-    st.sidebar.markdown(pdf_display, unsafe_allow_html=True)
 
-    # Extract tables using tabula
-    tables = tabula.read_pdf(pdf_file, pages=page, multiple_tables=True)
+    # Convert the selected PDF page to image and display in the sidebar
+    images = convert_from_path(temp_path, first_page=page, last_page=page)
+    for image in images:
+        st.sidebar.image(image, caption=f"Page {page}", use_column_width=True)
     
-    # Display LaTeX code on the right
-    st.title("LaTeX Code")
-    for i, table in enumerate(tables):
-        st.subheader(f"Table {i+1}")
-        latex_code = table.to_latex(index=False)
-        st.code(latex_code, language='latex')
+    # Open the selected page with pdfplumber for table extraction
+    with pdfplumber.open(temp_path) as pdf:
+        selected_page = pdf.pages[page-1]
+        
+        # Extract tables using pdfplumber
+        tables = selected_page.extract_tables()
+        
+        # Display LaTeX code on the right
+        st.title("LaTeX Code")
+        
+        for i, table in enumerate(tables):
+            st.subheader(f"Table {i+1}")
+            df = pd.DataFrame(table[1:], columns=table[0])
+            latex_code = df.to_latex(index=False)
+            st.code(latex_code, language='latex')
